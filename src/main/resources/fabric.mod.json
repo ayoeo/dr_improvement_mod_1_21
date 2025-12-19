@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "dr_improvement_mod",
+  "version": "${version}",
+  "name": "dr_improvement_mod",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/dr_improvement_mod/TODO-icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-datagen": [
+      "com.twoandahalfdevs.dr_improvement.client.DrImprovementModDataGenerator"
+    ],
+    "client": [
+      "com.twoandahalfdevs.dr_improvement.client.DrImprovementModClient"
+    ],
+    "modmenu": [
+      "com.twoandahalfdevs.dr_improvement.client.ModMenuIntegration"
+    ],
+    "main": [
+      "com.twoandahalfdevs.dr_improvement.DrImprovementMod"
+    ]
+  },
+  "mixins": [
+    "dr_improvement_mod.mixins.json",
+    {
+      "config": "dr_improvement_mod.client.mixins.json",
+      "environment": "client"
+    },
+    {
+      "config": "dr_improvement_mod.xaero.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-language-kotlin": ">=${kotlin_loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.twoandahalfdevs.dr_improvement.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "BossBarMixin",
+    "ClientCommonNetworkHandlerMixin",
+    "ClientPlayerEntityMixin",
+    "ClientPlayerInteractionManagerMixin",
+    "ClientPlayNetworkHandlerMixin",
+    "EntityMixin",
+    "EntityRenderMixin",
+    "GameRendererMixin",
+    "InGameHudMixin",
+    "InteractionManagerAccessor",
+    "ItemRendererMixin",
+    "ItemStackMixin",
+    "MouseMixin",
+    "PlayerEntityMixin",
+    "TeamMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

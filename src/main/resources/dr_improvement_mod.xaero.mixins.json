@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.twoandahalfdevs.dr_improvement.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.twoandahalfdevs.dr_improvement.XaeroMixinPlugin",
+  "client": [
+    "MixinRadarRenderer"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
