@@ -35,7 +35,7 @@ object OverlayShader {
       uniformBuffer = RenderSystem.getDevice().createBuffer(
         { "Overlay Uniforms" },
         GpuBuffer.USAGE_UNIFORM or GpuBuffer.USAGE_COPY_DST,
-        UNIFORM_SIZE
+        UNIFORM_SIZE.toLong(),
       )
 
     } catch (e: Exception) {

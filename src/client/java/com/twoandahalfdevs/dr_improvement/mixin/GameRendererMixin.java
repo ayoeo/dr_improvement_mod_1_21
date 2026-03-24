@@ -26,8 +26,8 @@ public class GameRendererMixin {
     }
   }
 
-  @Inject(method = "renderWorld", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/Camera;update(Lnet/minecraft/world/BlockView;Lnet/minecraft/entity/Entity;ZZF)V"))
-  public void preUpdateLookDir(RenderTickCounter renderTickCounter, CallbackInfo ci) {
+  @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/GameRenderer;updateCamera(Lnet/minecraft/client/render/RenderTickCounter;)V"))
+  public void preUpdateLookDir(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
     if (ModConfig.INSTANCE.getSettings().getReduceInputLag()) {
       GLFW.glfwPollEvents();
     }

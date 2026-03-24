@@ -1,12 +1,21 @@
 package com.twoandahalfdevs.dr_improvement.client
 
 import com.google.common.collect.EvictingQueue
+import com.twoandahalfdevs.dr_improvement.mixin.ItemCooldownEntryAccessor
+import com.twoandahalfdevs.dr_improvement.mixin.ItemCooldownManagerAccessor
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.render.RenderTickCounter
+import net.minecraft.entity.EquipmentSlot
+import net.minecraft.entity.player.PlayerEntity
+import net.minecraft.item.BowItem
+import net.minecraft.item.ItemStack
+import net.minecraft.item.PotionItem
+import net.minecraft.item.SplashPotionItem
+import net.minecraft.registry.tag.ItemTags
 import net.minecraft.scoreboard.ScoreHolder
 import net.minecraft.util.Identifier
 import net.minecraft.util.hit.BlockHitResult
@@ -16,7 +25,6 @@ import org.joml.Math
 import java.math.RoundingMode
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
-import kotlin.text.toInt
 
 @JvmField
 var lastClickTime = 0L
@@ -102,6 +110,19 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
     val textColor = 0x8CFFFFFF.toInt()
     val ySpreadCombat = if (ModConfig.settings.mode1440p) 36 else 27
     val xOffsetBottom = 12
+
+    val lowDurabilityLabels = minecraft.player?.let(::lowDurabilityItems).orEmpty()
+
+    if (lowDurabilityLabels.isNotEmpty()) {
+      val warningText = "§lLow Durability: ${lowDurabilityLabels.joinToString(", ")}"
+      context.drawTextWithShadow(
+        textRenderer,
+        warningText,
+        xCenter - textRenderer.getWidth(warningText) / 2,
+        minecraft.window.scaledHeight / 6,
+        0xADD13F3F.toInt(),
+      )
+    }
 
     // Potions!!!
     if (ModConfig.settings.showPotionInfo) {
@@ -195,7 +216,7 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
   var switchBackSlot = 0
   var switchBackTicks: Int? = null
 
-  private var pots = 3
+  private var pots = 5
   private var potCd: Int? = null
   private var totalPots = 0
 
@@ -257,8 +278,78 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
     else -> null
   }
 
+  private fun isPotion(stack: ItemStack): Boolean {
+    if (stack.isEmpty) return false
+    return stack.item is PotionItem || stack.item is SplashPotionItem
+  }
+
+  private fun lowDurabilityItems(player: PlayerEntity): List<String> {
+    val lowItems = mutableListOf<String>()
+
+    addLowDurabilityLabel(lowItems, "Helmet", player.getEquippedStack(EquipmentSlot.HEAD))
+    addLowDurabilityLabel(lowItems, "Chestplate", player.getEquippedStack(EquipmentSlot.CHEST))
+    addLowDurabilityLabel(lowItems, "Leggings", player.getEquippedStack(EquipmentSlot.LEGS))
+    addLowDurabilityLabel(lowItems, "Boots", player.getEquippedStack(EquipmentSlot.FEET))
+
+    val weapon = player.inventory.getStack(0)
+    if (isWeapon(weapon)) {
+      addLowDurabilityLabel(lowItems, "Weapon", weapon)
+    }
+
+    val bow = player.inventory.getStack(1)
+    if (bow.item is BowItem) {
+      addLowDurabilityLabel(lowItems, "Bow", bow)
+    }
+
+    return lowItems
+  }
+
+  private fun addLowDurabilityLabel(lowItems: MutableList<String>, label: String, stack: ItemStack) {
+    val nbt = ItemNbtStuff.customData(stack)
+    val durabilityPercent = ItemNbtStuff.durabilityPercent(nbt) ?: return
+    val rarity = ItemNbtStuff.itemRarity(nbt)
+    val tier = ItemNbtStuff.itemTier(nbt)
+
+    // Ignore <rare t1 and common t2+
+    val uncommonOrLower = rarity.equals("COMMON", true) ||
+      rarity.equals("UNCOMMON", true)
+
+    val ignore = rarity.equals("COMMON", true) || (tier == 1 && uncommonOrLower)
+    if (!ignore && durabilityPercent <= ItemNbtStuff.LOW_DURABILITY_THRESHOLD) {
+      lowItems.add(label)
+    }
+  }
+
+  private fun isWeapon(stack: ItemStack): Boolean {
+    return stack.isIn(ItemTags.SWORDS)
+      || stack.isIn(ItemTags.AXES)
+      || stack.isIn(ItemTags.HOES)
+      || stack.isIn(ItemTags.SHOVELS)
+      || stack.item is BowItem
+  }
+
+  private fun vanillaPotionCooldownSecs(player: PlayerEntity): Int? {
+    val cooldownManager = player.itemCooldownManager
+    val cooldownAccessor = cooldownManager as ItemCooldownManagerAccessor
+    val potionStacks = sequenceOf(
+      player.inventory.mainStacks.asSequence(),
+      sequenceOf(player.offHandStack),
+    ).flatten()
+
+    potionStacks.forEach { stack ->
+      if (!isPotion(stack) || !cooldownManager.isCoolingDown(stack)) return null
+
+      val group = cooldownManager.getGroup(stack)
+      val cooldown = cooldownAccessor.entries()[group] as? ItemCooldownEntryAccessor ?: return@forEach
+      val remainingTicks = (cooldown.endTick() - cooldownAccessor.tick()).coerceAtLeast(1)
+      return ceil(remainingTicks / 20.0).toInt()
+    }
+
+    return null
+  }
+
   fun cdString(playerId: Int): String? {
-    val (abil, activationTime) = playerCdMap.get(playerId) ?: return null
+    val (abil, activationTime) = playerCdMap[playerId] ?: return null
     val dur = durationFromAbility(abil) ?: return null
     val secsSinceActivation = (System.currentTimeMillis() - activationTime) / 1000.0
 
@@ -377,19 +468,13 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
         0.0
       )
 
-    if (attacked != null && attacked.isNotEmpty()) {
+    if (!attacked.isNullOrEmpty()) {
       val attackedPlayer = world.players.find {
-//      println("player: ${it.name.string}, $attacked")
         attacked.endsWith(it.name.string)
       }
 
       val attackedIsPlayer =
         attacked.contains(guildReg) || attackedPlayer != null
-//      ) &&
-//      !attacked.contains(' ')
-      //      attacked.contains(rankReg) ||
-
-//    println("attack: $attackedIsPlayer, $attacked")
 
       // Attacked is player pvp combat
       if (attackedIsPlayer) {
@@ -406,7 +491,6 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
         if (bleedNextTarget && attackedPlayer != null) {
           playerBleedMap[attackedPlayer.id] = System.currentTimeMillis()
         }
-//      println("setting timer: probably $probablyCombatTimer, $combatTimer now")
       } else {
         // Attacked is monster pve combat
 
@@ -422,7 +506,7 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
 
       // They're bleeeedin now
       bleedNextTarget = false
-    } else if (attacker != null && attacker.isNotEmpty()) {
+    } else if (!attacker.isNullOrEmpty()) {
       // MONSTER??
       if (attacker !in notRealCombat) {
         // COMBAT BONUS WHOAHHO
@@ -448,7 +532,7 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
   override fun onStartTick(client: MinecraftClient) {
     switchBackTicks?.let { ticks ->
       if (ticks == 0) {
-        client.player?.getInventory()?.setSelectedSlot(switchBackSlot)
+        client.player?.getInventory()?.selectedSlot = switchBackSlot
         switchBackTicks = null
       } else {
         switchBackTicks = ticks - 1
@@ -458,28 +542,23 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
     val world = client.world ?: return
 
     // Update health
-    val toRemove = HashSet<String?>()
-    for (entry in scoreWasUpdated.entries) {
-      val player =
-        world.getPlayers().stream()
-          .filter { p -> p.stringifiedName == entry.key }
-          .findFirst()
+    val iter = scoreWasUpdated.entries.iterator()
+    while (iter.hasNext()) {
+      val entry = iter.next()
+      val player = world.getPlayers()
+        .firstOrNull { p -> p.stringifiedName == entry.key }
       val health = latestCurrentHealth.getOrDefault(entry.key, null)
-      if (player.isPresent && health != null && health > 0f) {
-        val clientMaxHealth = player.get().maxHealth
+      if (player != null && health != null && health > 0f) {
+        val clientMaxHealth = player.maxHealth
         if (clientMaxHealth > 0f) {
           val ratio = clientMaxHealth / health
           val maxHealth = entry.value.toDouble() * ratio
           if (!maxHealth.isNaN() && maxHealth > 0f) {
-            maxHealthValues[player.get().stringifiedName] = round(maxHealth).toInt()
+            maxHealthValues[player.stringifiedName] = round(maxHealth).toInt()
           }
         }
-        toRemove.add(entry.key)
+        iter.remove()
       }
-    }
-
-    for (e in toRemove) {
-      scoreWasUpdated.remove(e)
     }
 
     // Update the scoreboard to reflect real health values
@@ -488,14 +567,13 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
     val scores = scoreboard.getScoreboardEntries(healthObjective)
     for (score in scores) {
       val maxHealth = maxHealthValues[score.owner] ?: continue
-      val player = world.getPlayers().stream()
-        .filter { p -> p.stringifiedName == score.owner() }
-        .findFirst()
+      val player = world.getPlayers()
+        .firstOrNull { p -> p.stringifiedName == score.owner() }
 
-      if (player.isPresent) {
-        val clientMaxHealth = player.get().maxHealth
+      if (player != null) {
+        val clientMaxHealth = player.maxHealth
         if (clientMaxHealth > 0) {
-          val ratio = player.get().health / clientMaxHealth
+          val ratio = player.health / clientMaxHealth
           val newValue = Math.round(maxHealth.toDouble() * ratio).toInt()
 
           val scoreHolder = ScoreHolder.fromName(score.owner())
@@ -506,7 +584,7 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
     }
   }
 
-  override fun onEndTick(p0: MinecraftClient?) {
+  override fun onEndTick(p0: MinecraftClient) {
     // Cooldown
     if (actionBarTime > 0 && actionBarMsg != null) {
       val cdMatches = ultCdReg.find(actionBarMsg!!)
@@ -515,8 +593,8 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
           val col = cdMatches.groupValues.getOrNull(1)
           val min = cdMatches.groupValues.getOrNull(2)
           val sec = cdMatches.groupValues.getOrNull(3)
-          val minutes = if (min != null && min.isNotEmpty()) min.toInt() else 0
-          val seconds = if (sec != null && sec.isNotEmpty()) sec.toInt() else 0
+          val minutes = if (!min.isNullOrEmpty()) min.toInt() else 0
+          val seconds = if (!sec.isNullOrEmpty()) sec.toInt() else 0
           cd = minutes * 60 + seconds
           cdActive = col == "a"
           lastUpdatedCdTime = System.currentTimeMillis() - ((60 - actionBarTime) * 50)
@@ -535,12 +613,12 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
           System.currentTimeMillis() - ((60 - actionBarTime) * 50)
       } else {
         // Nothing on the bar, no pot cooldown.
-        pots = 3
+        pots = 5
         potCd = null
       }
     } else {
       cd = null
-      pots = 3
+      pots = 5
       potCd = null
       potsStr = ""
       cdStr = ""
@@ -548,6 +626,8 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
 
     val minecraft = MinecraftClient.getInstance()
     val player = minecraft.player ?: return
+
+    val vanillaPotCd = vanillaPotionCooldownSecs(player)
 
     totalPots = player.inventory.mainStacks.count {
       it.item.translationKey.equals("item.minecraft.potion") || it.item.translationKey.equals("item.minecraft.splash_potion")
@@ -560,13 +640,17 @@ class DrImprovementModClient : ClientModInitializer, ClientTickEvents.StartTick,
     // Update pots str
     potsStrColor = 0x8cfa5043
     val usablePots = pots.coerceAtMost(totalPots)
-    if (usablePots >= 3) potsStrColor = 0x8c52ff80
-    else if (usablePots >= 2) potsStrColor = 0x8ceeff6b
+    if (usablePots >= 5) potsStrColor = 0x8c52ff80
+    else if (usablePots >= 3) potsStrColor = 0x8ceeff6b
     else if (usablePots >= 1) potsStrColor = 0x8cff8e38
     potsStr = "$usablePots / $totalPots"
-    if (potCd != null) {
-      val potCdNow = (potCd!! - (System.currentTimeMillis() - lastUpdatedPotCdTime) / 1000).coerceAtLeast(0)
-      potsStr += " §7(${potCdNow}s)"
+    val actionBarPotCdNow = potCd?.let {
+      (it - (System.currentTimeMillis() - lastUpdatedPotCdTime) / 1000).coerceAtLeast(0)
+    }
+    val displayedPotCd = vanillaPotCd ?: actionBarPotCdNow
+    val potCdColor = if (vanillaPotCd != null) "§c" else "§7"
+    if (displayedPotCd != null) {
+      potsStr += " $potCdColor(${displayedPotCd}s)"
     }
 
     // Update cd str

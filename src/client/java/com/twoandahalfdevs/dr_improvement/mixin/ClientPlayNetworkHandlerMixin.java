@@ -58,8 +58,9 @@ public abstract class ClientPlayNetworkHandlerMixin extends ClientCommonNetworkH
 
   @Inject(method = "onGameMessage", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/NetworkThreadUtils;forceMainThread(Lnet/minecraft/network/packet/Packet;Lnet/minecraft/network/listener/PacketListener;Lnet/minecraft/network/PacketApplyBatcher;)V", shift = At.Shift.AFTER), cancellable = true)
   public void onGameMessageHead(GameMessageS2CPacket packet, CallbackInfo ci) {
-    if (!packet.overlay()) {
-      DrImprovementModClientKt.INSTANCE.onChatMessage(packet.content().getString());
+    var content = packet.content();
+    if (!packet.overlay() && content != null) {
+      DrImprovementModClientKt.INSTANCE.onChatMessage(content.getString());
     }
   }
 
@@ -67,7 +68,6 @@ public abstract class ClientPlayNetworkHandlerMixin extends ClientCommonNetworkH
   public void onChatMessageHead(ChatMessageS2CPacket packet, CallbackInfo ci) {
     DrImprovementModClientKt.INSTANCE.onChatMessage(packet.body().content());
   }
-
 
   @Inject(method = "onScoreboardScoreUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/NetworkThreadUtils;forceMainThread(Lnet/minecraft/network/packet/Packet;Lnet/minecraft/network/listener/PacketListener;Lnet/minecraft/network/PacketApplyBatcher;)V", shift = At.Shift.AFTER), cancellable = true)
   public void onScoreboardPlayerUpdateHead(ScoreboardScoreUpdateS2CPacket packet, CallbackInfo ci) {
@@ -91,9 +91,6 @@ public abstract class ClientPlayNetworkHandlerMixin extends ClientCommonNetworkH
 
     // We have to wait for an update haha
     DrImprovementModClientKt.getLatestCurrentHealth().remove(packet.scoreHolderName());
-
-    // TODO - just update the score when we get some debug haha
-    ci.cancel();
   }
 
   @Inject(method = "onEntityTrackerUpdate", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/NetworkThreadUtils;forceMainThread(Lnet/minecraft/network/packet/Packet;Lnet/minecraft/network/listener/PacketListener;Lnet/minecraft/network/PacketApplyBatcher;)V", shift = At.Shift.AFTER), cancellable = true)

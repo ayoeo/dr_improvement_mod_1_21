@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(PlayerEntity.class)
 public class PlayerEntityMixin {
-  @Redirect(method = "attack", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;addCritParticles(Lnet/minecraft/entity/Entity;)V"))
+  @Redirect(method = "addAttackParticlesAndSounds", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;addCritParticles(Lnet/minecraft/entity/Entity;)V"))
   private void modifyCrittingParticles(PlayerEntity instance, Entity target) {
     // No client-side crit particles hehe
   }

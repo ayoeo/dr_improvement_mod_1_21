@@ -21,6 +21,7 @@ import xaero.common.misc.Misc;
 import xaero.hud.minimap.element.render.MinimapElementGraphics;
 import xaero.hud.minimap.element.render.MinimapElementRenderInfo;
 import xaero.hud.render.util.RenderBufferUtil;
+import xaero.lib.client.graphics.XaeroBufferProvider;
 
 @Mixin(value = xaero.hud.minimap.radar.render.element.RadarRenderer.class, remap = false)
 public class MixinRadarRenderer {
@@ -34,7 +35,7 @@ public class MixinRadarRenderer {
   private VertexConsumer labelBgBuilder;
 
   @Shadow
-  private VertexConsumerProvider.Immediate minimapBufferSource;
+  private XaeroBufferProvider minimapBufferSource;
 
   @Inject(method = "renderElement(Lnet/minecraft/entity/Entity;ZZDFDDLxaero/hud/minimap/element/render/MinimapElementRenderInfo;Lxaero/hud/minimap/element/render/MinimapElementGraphics;Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;)Z", at = @At("HEAD"), cancellable = true)
   private void filterNPCs(Entity entity, boolean highlighted, boolean outOfBounds, double optionalDepth, float optionalScale, double partialX, double partialY, MinimapElementRenderInfo renderInfo, MinimapElementGraphics guiGraphics, VertexConsumerProvider.Immediate vanillaBufferSource, CallbackInfoReturnable<Boolean> cir) {

@@ -57,6 +57,7 @@ repositories {
   maven("https://maven.shedaniel.me/")
   maven("https://maven.terraformersmc.com/releases/")
   maven("https://api.modrinth.com/maven")
+  maven("https://chocolateminecraft.com/maven")
 }
 
 dependencies {
@@ -72,7 +73,9 @@ dependencies {
   modApi("com.terraformersmc:modmenu:16.0.0-rc.1")
 
   modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
-  modImplementation("maven.modrinth:xaeros-minimap:${project.property("minimap_version")}_Fabric_1.21.9")
+  //modImplementation("maven.modrinth:xaeros-minimap:${project.property("minimap_version")}_Fabric_1.21.11")
+  modImplementation("xaero.lib:xaerolib-fabric-1.21.11:1.1.0")
+  modImplementation("xaero.minimap:xaerominimap-fabric-1.21.11:25.3.10")
   implementation(kotlin("stdlib-jdk8"))
 }
 

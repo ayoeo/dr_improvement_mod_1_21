@@ -1,8 +1,6 @@
 package com.twoandahalfdevs.dr_improvement.mixin;
 
-import net.minecraft.component.ComponentHolder;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import com.twoandahalfdevs.dr_improvement.client.ItemNbtStuff;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -12,7 +10,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -26,7 +23,7 @@ import java.util.regex.Pattern;
 @Mixin(ItemStack.class)
 public abstract class ItemStackMixin {
   @Unique
-  private final Pattern originRegex = Pattern.compile("(.*) \\((.*)/.*\\)");
+  private static final Pattern ORIGIN_REGEX = Pattern.compile("(.*) \\((.*)/.*\\)");
 
   @Inject(method = "getTooltip", at = @At("RETURN"))
   private void getTooltip(Item.TooltipContext context, @Nullable PlayerEntity player, TooltipType type, CallbackInfoReturnable<List<Text>> cir) {
@@ -35,22 +32,22 @@ public abstract class ItemStackMixin {
 
     ItemStack stack = (ItemStack) (Object) this;
 
-    var customData = stack.get(DataComponentTypes.CUSTOM_DATA);
+    NbtCompound nbt = ItemNbtStuff.customData(stack);
+    var durabilityText = ItemNbtStuff.durabilityText(nbt);
+    if (durabilityText != null) {
+      additionalList.add(durabilityText);
+    }
 
-    if (customData != null) {
-      NbtCompound nbt = customData.copyNbt();
+    if (nbt != null && nbt.contains("origin")) {
+      var origin = nbt.getString("origin");
+      if (origin.isPresent()) {
+        Matcher matcher = ORIGIN_REGEX.matcher(origin.get());
+        if (matcher.find()) {
+          if (matcher.groupCount() == 2) {
+            String originType = matcher.group(1);
+            String playerStr = matcher.group(2);
 
-      if (nbt.contains("origin")) {
-        var origin = nbt.getString("origin");
-        if (origin.isPresent()) {
-          Matcher matcher = originRegex.matcher(origin.get());
-          if (matcher.find()) {
-            if (matcher.groupCount() == 2) {
-              String originType = matcher.group(1);
-              String playerStr = matcher.group(2);
-
-              additionalList.add(Text.of(Formatting.GRAY + "Origin: " + originType + " - " + Formatting.ITALIC + playerStr));
-            }
+            additionalList.add(Text.of(Formatting.GRAY + "Origin: " + originType + " - " + Formatting.ITALIC + playerStr));
           }
         }
       }

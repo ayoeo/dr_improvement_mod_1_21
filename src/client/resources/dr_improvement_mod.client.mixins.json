@@ -14,11 +14,15 @@
     "GameRendererMixin",
     "InGameHudMixin",
     "InteractionManagerAccessor",
+    "ItemCooldownEntryAccessor",
+    "ItemCooldownManagerAccessor",
     "ItemRendererMixin",
     "ItemStackMixin",
+    "MinecraftClientAccessor",
     "MouseMixin",
     "PlayerEntityMixin",
-    "TeamMixin"
+    "TeamMixin",
+    "DataResultErrorMixin"
   ],
   "injectors": {
     "defaultRequire": 1
